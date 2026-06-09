@@ -51,7 +51,7 @@ export function useActivities() {
             id,
             created_at,
             post_id,
-            posts!post_id(caption),
+            posts(caption),
             profiles!liker_id(id, username, avatar_url, full_name)
           `
           )
@@ -121,7 +121,7 @@ export function useActivities() {
             content,
             created_at,
             post_id,
-            posts!post_id(caption),
+            posts(caption),
             profiles!user_id(id, username, avatar_url, full_name)
           `
           )
