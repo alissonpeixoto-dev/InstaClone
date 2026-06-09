@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-ig-purple: #833AB4;
+  --color-ig-pink: #C13584;
+  --color-ig-red-pink: #E1306C;
+  --color-ig-red: #FD1D1D;
+  --color-ig-orange: #F77737;
+  --color-ig-blue: #405DE6;
+  --color-ig-dark: #262626;
+  --color-ig-gray: #8e8e8e;
+  --color-ig-light: #F5F5F5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  background-color: #fafafa;
+  color: #262626;
+  margin: 0;
+  padding: 0;
+}
+
+
+/* Instagram gradient */
+.ig-gradient {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+}
+
+.ig-gradient-text {
+  background: linear-gradient(45deg, #833AB4, #C13584, #E1306C, #FD1D1D, #F77737);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ig-gradient-border {
+  background: linear-gradient(white, white) padding-box,
+    linear-gradient(45deg, #833AB4, #C13584, #E1306C, #FD1D1D, #F77737) border-box;
+  border: 2px solid transparent;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7c7c7;
+  border-radius: 2px;
+}
+
+/* Skeleton animation */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background-color: #efefef;
+  border-radius: 4px;
+}
+
+/* Story ring */
+.story-ring {
+  background: linear-gradient(45deg, #833AB4, #C13584, #E1306C, #FD1D1D, #F77737);
+  padding: 2px;
+  border-radius: 50%;
+}
+
+.story-ring-inner {
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+/* Transition */
+* {
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Post image */
+.post-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
