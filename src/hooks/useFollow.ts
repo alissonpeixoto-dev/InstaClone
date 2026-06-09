@@ -99,10 +99,16 @@ export function useFollow(userId: string | undefined) {
         .select("id", { count: "exact", head: true })
         .eq("following_id", userId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.status === 404) {
+          console.warn("[Follow] Tabela 'follows' não existe. Execute SETUP_FOLLOWS.sql");
+        } else {
+          throw error;
+        }
+      }
       return count ?? 0;
     } catch (err) {
-      console.error("[Follow] Error getting followers count:", err);
+      console.warn("[Follow] Error getting followers count:", err);
       return 0;
     }
   }, [userId]);
@@ -116,10 +122,16 @@ export function useFollow(userId: string | undefined) {
         .select("id", { count: "exact", head: true })
         .eq("follower_id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        if (error.status === 404) {
+          console.warn("[Follow] Tabela 'follows' não existe. Execute SETUP_FOLLOWS.sql");
+        } else {
+          throw error;
+        }
+      }
       return count ?? 0;
     } catch (err) {
-      console.error("[Follow] Error getting following count:", err);
+      console.warn("[Follow] Error getting following count:", err);
       return 0;
     }
   }, [user]);
