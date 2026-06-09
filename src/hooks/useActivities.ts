@@ -24,8 +24,6 @@ export function useActivities() {
     try {
       setLoading(true);
       const allActivities: Activity[] = [];
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        .toISOString();
 
       console.log("[Activities] Fetching activities for user:", user.id);
 
@@ -44,46 +42,50 @@ export function useActivities() {
       // Step 2: Fetch likes on user's posts
       if (userPosts && userPosts.length > 0) {
         const postIds = userPosts.map((p) => p.id);
-        const { data: likes, error: likesError } = await supabase
-          .from("likes")
-          .select("id, created_at, post_id, liker_id")
-          .in("post_id", postIds)
-          .gte("created_at", sevenDaysAgo)
-          .order("created_at", { ascending: false })
-          .limit(20);
+        console.log("[Activities] Fetching likes for posts:", postIds);
+        
+        try {
+          const { data: likes, error: likesError } = await supabase
+            .from("likes")
+            .select("id, created_at, post_id, liker_id")
+            .in("post_id", postIds)
+            .order("created_at", { ascending: false });
 
-        if (likesError) {
-          console.error("[Activities] Error fetching likes:", likesError);
-        } else {
-          console.log("[Activities] Found likes:", likes?.length);
-          
-          // Get user profiles for likes
-          if (likes && likes.length > 0) {
-            const likerIds = [...new Set(likes.map((l) => l.liker_id))];
-            const { data: likerProfiles } = await supabase
-              .from("profiles")
-              .select("id, username, avatar_url, full_name")
-              .in("id", likerIds);
+          if (likesError) {
+            console.error("[Activities] Error fetching likes:", likesError.message || likesError);
+          } else {
+            console.log("[Activities] Found likes:", likes?.length);
+            
+            // Get user profiles for likes
+            if (likes && likes.length > 0) {
+              const likerIds = [...new Set(likes.map((l) => l.liker_id))];
+              const { data: likerProfiles } = await supabase
+                .from("profiles")
+                .select("id, username, avatar_url, full_name")
+                .in("id", likerIds);
 
-            const profilesMap = new Map(
-              likerProfiles?.map((p) => [p.id, p]) || []
-            );
+              const profilesMap = new Map(
+                likerProfiles?.map((p) => [p.id, p]) || []
+              );
 
-            likes.forEach((like) => {
-              const profile = profilesMap.get(like.liker_id);
-              if (profile) {
-                const post = userPosts.find((p) => p.id === like.post_id);
-                allActivities.push({
-                  id: `like-${like.id}`,
-                  type: "like",
-                  user: profile,
-                  postId: like.post_id,
-                  postCaption: post?.caption,
-                  createdAt: like.created_at,
-                });
-              }
-            });
+              likes.forEach((like) => {
+                const profile = profilesMap.get(like.liker_id);
+                if (profile) {
+                  const post = userPosts.find((p) => p.id === like.post_id);
+                  allActivities.push({
+                    id: `like-${like.id}`,
+                    type: "like",
+                    user: profile,
+                    postId: like.post_id,
+                    postCaption: post?.caption,
+                    createdAt: like.created_at,
+                  });
+                }
+              });
+            }
           }
+        } catch (err) {
+          console.error("[Activities] Exception fetching likes:", err);
         }
       }
 
@@ -92,12 +94,10 @@ export function useActivities() {
         .from("follows")
         .select("id, created_at, follower_id")
         .eq("following_id", user.id)
-        .gte("created_at", sevenDaysAgo)
-        .order("created_at", { ascending: false })
-        .limit(20);
+        .order("created_at", { ascending: false });
 
       if (followsError) {
-        console.error("[Activities] Error fetching follows:", followsError);
+        console.error("[Activities] Error fetching follows:", followsError.message || followsError);
       } else {
         console.log("[Activities] Found follows:", follows?.length);
         
@@ -134,12 +134,10 @@ export function useActivities() {
           .from("comments")
           .select("id, content, created_at, post_id, user_id")
           .in("post_id", postIds)
-          .gte("created_at", sevenDaysAgo)
-          .order("created_at", { ascending: false })
-          .limit(20);
+          .order("created_at", { ascending: false });
 
         if (commentsError) {
-          console.error("[Activities] Error fetching comments:", commentsError);
+          console.error("[Activities] Error fetching comments:", commentsError.message || commentsError);
         } else {
           console.log("[Activities] Found comments:", comments?.length);
           
