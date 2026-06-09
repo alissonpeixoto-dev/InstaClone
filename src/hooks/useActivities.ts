@@ -23,50 +23,97 @@ export function useActivities() {
 
     try {
       setLoading(true);
-
-      // Fetch likes on user's posts
+      const allActivities: Activity[] = [];
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         .toISOString();
 
-      const { data: likes } = await supabase
-        .from("likes")
-        .select(
-          `
-          id,
-          created_at,
-          user:profiles!liker_id(id, username, avatar_url, full_name)
-        `
-        )
-        .eq("post_id", user.id) // likes on posts by this user
-        .gte("created_at", sevenDaysAgo)
-        .order("created_at", { ascending: false })
-        .limit(10);
+      console.log("[Activities] Fetching activities for user:", user.id);
 
-      // Fetch follows of user
-      const { data: follows } = await supabase
+      // Step 1: Get user's posts
+      const { data: userPosts, error: postsError } = await supabase
+        .from("posts")
+        .select("id, caption")
+        .eq("user_id", user.id);
+
+      if (postsError) {
+        console.error("[Activities] Error fetching user posts:", postsError);
+      } else {
+        console.log("[Activities] Found posts:", userPosts?.length);
+      }
+
+      // Step 2: Fetch likes on user's posts
+      if (userPosts && userPosts.length > 0) {
+        const postIds = userPosts.map((p) => p.id);
+        const { data: likes, error: likesError } = await supabase
+          .from("likes")
+          .select(
+            `
+            id,
+            created_at,
+            post_id,
+            posts!post_id(caption),
+            profiles!liker_id(id, username, avatar_url, full_name)
+          `
+          )
+          .in("post_id", postIds)
+          .gte("created_at", sevenDaysAgo)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (likesError) {
+          console.error("[Activities] Error fetching likes:", likesError);
+        } else {
+          console.log("[Activities] Found likes:", likes?.length);
+          likes?.forEach((like: any) => {
+            if (like.profiles) {
+              allActivities.push({
+                id: `like-${like.id}`,
+                type: "like",
+                user: like.profiles,
+                postId: like.post_id,
+                postCaption: like.posts?.caption,
+                createdAt: like.created_at,
+              });
+            }
+          });
+        }
+      }
+
+      // Step 3: Fetch follows
+      const { data: follows, error: followsError } = await supabase
         .from("follows")
         .select(
           `
           id,
           created_at,
-          follower:profiles!follower_id(id, username, avatar_url, full_name)
+          profiles!follower_id(id, username, avatar_url, full_name)
         `
         )
         .eq("following_id", user.id)
         .gte("created_at", sevenDaysAgo)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
 
-      // Fetch comments on user's posts
-      const { data: userPosts } = await supabase
-        .from("posts")
-        .select("id")
-        .eq("user_id", user.id);
+      if (followsError) {
+        console.error("[Activities] Error fetching follows:", followsError);
+      } else {
+        console.log("[Activities] Found follows:", follows?.length);
+        follows?.forEach((follow: any) => {
+          if (follow.profiles) {
+            allActivities.push({
+              id: `follow-${follow.id}`,
+              type: "follow",
+              user: follow.profiles,
+              createdAt: follow.created_at,
+            });
+          }
+        });
+      }
 
-      let comments: any[] = [];
+      // Step 4: Fetch comments on user's posts
       if (userPosts && userPosts.length > 0) {
-        const postIds = userPosts.map((p: any) => p.id);
-        const { data: commentData } = await supabase
+        const postIds = userPosts.map((p) => p.id);
+        const { data: comments, error: commentsError } = await supabase
           .from("comments")
           .select(
             `
@@ -74,55 +121,34 @@ export function useActivities() {
             content,
             created_at,
             post_id,
-            user:profiles!user_id(id, username, avatar_url, full_name),
-            post:posts(caption)
+            posts!post_id(caption),
+            profiles!user_id(id, username, avatar_url, full_name)
           `
           )
           .in("post_id", postIds)
           .gte("created_at", sevenDaysAgo)
           .order("created_at", { ascending: false })
-          .limit(10);
-        comments = commentData || [];
+          .limit(20);
+
+        if (commentsError) {
+          console.error("[Activities] Error fetching comments:", commentsError);
+        } else {
+          console.log("[Activities] Found comments:", comments?.length);
+          comments?.forEach((comment: any) => {
+            if (comment.profiles) {
+              allActivities.push({
+                id: `comment-${comment.id}`,
+                type: "comment",
+                user: comment.profiles,
+                postId: comment.post_id,
+                postCaption: comment.posts?.caption,
+                comment: comment.content,
+                createdAt: comment.created_at,
+              });
+            }
+          });
+        }
       }
-
-      // Combine and sort activities
-      const allActivities: Activity[] = [];
-
-      likes?.forEach((like: any) => {
-        if (like.user) {
-          allActivities.push({
-            id: `like-${like.id}`,
-            type: "like",
-            user: like.user,
-            createdAt: like.created_at,
-          });
-        }
-      });
-
-      follows?.forEach((follow: any) => {
-        if (follow.follower) {
-          allActivities.push({
-            id: `follow-${follow.id}`,
-            type: "follow",
-            user: follow.follower,
-            createdAt: follow.created_at,
-          });
-        }
-      });
-
-      comments.forEach((comment: any) => {
-        if (comment.user && comment.post) {
-          allActivities.push({
-            id: `comment-${comment.id}`,
-            type: "comment",
-            user: comment.user,
-            postId: comment.post_id,
-            postCaption: comment.post.caption,
-            comment: comment.content,
-            createdAt: comment.created_at,
-          });
-        }
-      });
 
       // Sort by date descending
       allActivities.sort(
@@ -130,7 +156,8 @@ export function useActivities() {
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      setActivities(allActivities.slice(0, 20)); // Limit to 20 most recent
+      console.log("[Activities] Total activities:", allActivities.length);
+      setActivities(allActivities.slice(0, 50)); // Limit to 50 most recent
     } catch (err) {
       console.error("[Activities] Error fetching activities:", err);
     } finally {
