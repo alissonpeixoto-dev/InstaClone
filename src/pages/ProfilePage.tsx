@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserPosts } from "@/hooks/usePosts";
+import { useFollow } from "@/hooks/useFollow";
 import { useToast } from "@/components/ui/Toast";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -27,9 +28,14 @@ export default function ProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<PostWithProfile | null>(null);
   const [deletingPost, setDeletingPost] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const isOwner = profile?.id === user?.id;
   const { posts, loading: postsLoading, deletePost } = useUserPosts(profile?.id);
+  const { isFollowing: checkIsFollowing, toggleFollow, getFollowersCount, getFollowingCount } = useFollow(profile?.id);
 
   useEffect(() => {
     const load = async () => {
@@ -71,6 +77,42 @@ export default function ProfilePage() {
     load();
   }, [username]);
 
+  // Carregar dados de follow
+  useEffect(() => {
+    const loadFollowData = async () => {
+      if (!profile || isOwner) return;
+
+      try {
+        const [following, followers] = await Promise.all([
+          checkIsFollowing(),
+          getFollowersCount(),
+        ]);
+        setIsFollowing(following);
+        setFollowersCount(followers);
+      } catch (err) {
+        console.error("Error loading follow data:", err);
+      }
+    };
+
+    loadFollowData();
+  }, [profile, isOwner, checkIsFollowing, getFollowersCount]);
+
+  // Carregar contagem de seguindo do usuário owner
+  useEffect(() => {
+    const loadFollowingCount = async () => {
+      if (!isOwner) return;
+
+      try {
+        const count = await getFollowingCount();
+        setFollowingCount(count);
+      } catch (err) {
+        console.error("Error loading following count:", err);
+      }
+    };
+
+    loadFollowingCount();
+  }, [isOwner, getFollowingCount]);
+
   const handleDeletePost = async (postId: string) => {
     setDeletingPost(postId);
     const { error } = await deletePost(postId);
@@ -80,6 +122,20 @@ export default function ProfilePage() {
     } else {
       toast.success("Postagem excluída.");
       setSelectedPost(null);
+    }
+  };
+
+  const handleFollow = async () => {
+    setFollowLoading(true);
+    const { error } = await toggleFollow(isFollowing);
+    setFollowLoading(false);
+
+    if (error) {
+      toast.error(error);
+    } else {
+      setIsFollowing(!isFollowing);
+      setFollowersCount((prev) => (isFollowing ? prev - 1 : prev + 1));
+      toast.success(isFollowing ? "Deixou de seguir." : "Agora você segue este usuário.");
     }
   };
 
@@ -136,7 +192,14 @@ export default function ProfilePage() {
                 </Button>
               </div>
             ) : (
-              <Button size="sm">Seguir</Button>
+              <Button
+                size="sm"
+                variant={isFollowing ? "outline" : "primary"}
+                onClick={handleFollow}
+                disabled={followLoading}
+              >
+                {isFollowing ? "Deixar de seguir" : "Seguir"}
+              </Button>
             )}
           </div>
 
@@ -155,11 +218,17 @@ export default function ProfilePage() {
               </span>
             </div>
             <div>
-              <span className="text-sm font-semibold text-[#262626]">0</span>
-              <span className="text-sm text-[#262626] ml-1">seguidores</span>
+              <span className="text-sm font-semibold text-[#262626]">
+                {followersCount.toLocaleString("pt-BR")}
+              </span>
+              <span className="text-sm text-[#262626] ml-1">
+                {followersCount === 1 ? "seguidor" : "seguidores"}
+              </span>
             </div>
             <div>
-              <span className="text-sm font-semibold text-[#262626]">0</span>
+              <span className="text-sm font-semibold text-[#262626]">
+                {isOwner ? followingCount.toLocaleString("pt-BR") : "0"}
+              </span>
               <span className="text-sm text-[#262626] ml-1">seguindo</span>
             </div>
           </div>
