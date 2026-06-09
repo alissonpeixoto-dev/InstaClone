@@ -46,15 +46,7 @@ export function useActivities() {
         const postIds = userPosts.map((p) => p.id);
         const { data: likes, error: likesError } = await supabase
           .from("likes")
-          .select(
-            `
-            id,
-            created_at,
-            post_id,
-            posts(caption),
-            profiles!liker_id(id, username, avatar_url, full_name)
-          `
-          )
+          .select("id, created_at, post_id, liker_id")
           .in("post_id", postIds)
           .gte("created_at", sevenDaysAgo)
           .order("created_at", { ascending: false })
@@ -64,31 +56,41 @@ export function useActivities() {
           console.error("[Activities] Error fetching likes:", likesError);
         } else {
           console.log("[Activities] Found likes:", likes?.length);
-          likes?.forEach((like: any) => {
-            if (like.profiles) {
-              allActivities.push({
-                id: `like-${like.id}`,
-                type: "like",
-                user: like.profiles,
-                postId: like.post_id,
-                postCaption: like.posts?.caption,
-                createdAt: like.created_at,
-              });
-            }
-          });
+          
+          // Get user profiles for likes
+          if (likes && likes.length > 0) {
+            const likerIds = [...new Set(likes.map((l) => l.liker_id))];
+            const { data: likerProfiles } = await supabase
+              .from("profiles")
+              .select("id, username, avatar_url, full_name")
+              .in("id", likerIds);
+
+            const profilesMap = new Map(
+              likerProfiles?.map((p) => [p.id, p]) || []
+            );
+
+            likes.forEach((like) => {
+              const profile = profilesMap.get(like.liker_id);
+              if (profile) {
+                const post = userPosts.find((p) => p.id === like.post_id);
+                allActivities.push({
+                  id: `like-${like.id}`,
+                  type: "like",
+                  user: profile,
+                  postId: like.post_id,
+                  postCaption: post?.caption,
+                  createdAt: like.created_at,
+                });
+              }
+            });
+          }
         }
       }
 
       // Step 3: Fetch follows
       const { data: follows, error: followsError } = await supabase
         .from("follows")
-        .select(
-          `
-          id,
-          created_at,
-          profiles!follower_id(id, username, avatar_url, full_name)
-        `
-        )
+        .select("id, created_at, follower_id")
         .eq("following_id", user.id)
         .gte("created_at", sevenDaysAgo)
         .order("created_at", { ascending: false })
@@ -98,16 +100,31 @@ export function useActivities() {
         console.error("[Activities] Error fetching follows:", followsError);
       } else {
         console.log("[Activities] Found follows:", follows?.length);
-        follows?.forEach((follow: any) => {
-          if (follow.profiles) {
-            allActivities.push({
-              id: `follow-${follow.id}`,
-              type: "follow",
-              user: follow.profiles,
-              createdAt: follow.created_at,
-            });
-          }
-        });
+        
+        // Get user profiles for follows
+        if (follows && follows.length > 0) {
+          const followerIds = [...new Set(follows.map((f) => f.follower_id))];
+          const { data: followerProfiles } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, full_name")
+            .in("id", followerIds);
+
+          const profilesMap = new Map(
+            followerProfiles?.map((p) => [p.id, p]) || []
+          );
+
+          follows.forEach((follow) => {
+            const profile = profilesMap.get(follow.follower_id);
+            if (profile) {
+              allActivities.push({
+                id: `follow-${follow.id}`,
+                type: "follow",
+                user: profile,
+                createdAt: follow.created_at,
+              });
+            }
+          });
+        }
       }
 
       // Step 4: Fetch comments on user's posts
@@ -115,16 +132,7 @@ export function useActivities() {
         const postIds = userPosts.map((p) => p.id);
         const { data: comments, error: commentsError } = await supabase
           .from("comments")
-          .select(
-            `
-            id,
-            content,
-            created_at,
-            post_id,
-            posts(caption),
-            profiles!user_id(id, username, avatar_url, full_name)
-          `
-          )
+          .select("id, content, created_at, post_id, user_id")
           .in("post_id", postIds)
           .gte("created_at", sevenDaysAgo)
           .order("created_at", { ascending: false })
@@ -134,19 +142,35 @@ export function useActivities() {
           console.error("[Activities] Error fetching comments:", commentsError);
         } else {
           console.log("[Activities] Found comments:", comments?.length);
-          comments?.forEach((comment: any) => {
-            if (comment.profiles) {
-              allActivities.push({
-                id: `comment-${comment.id}`,
-                type: "comment",
-                user: comment.profiles,
-                postId: comment.post_id,
-                postCaption: comment.posts?.caption,
-                comment: comment.content,
-                createdAt: comment.created_at,
-              });
-            }
-          });
+          
+          // Get user profiles for comments
+          if (comments && comments.length > 0) {
+            const commentUserIds = [...new Set(comments.map((c) => c.user_id))];
+            const { data: commentProfiles } = await supabase
+              .from("profiles")
+              .select("id, username, avatar_url, full_name")
+              .in("id", commentUserIds);
+
+            const profilesMap = new Map(
+              commentProfiles?.map((p) => [p.id, p]) || []
+            );
+
+            comments.forEach((comment) => {
+              const profile = profilesMap.get(comment.user_id);
+              if (profile) {
+                const post = userPosts.find((p) => p.id === comment.post_id);
+                allActivities.push({
+                  id: `comment-${comment.id}`,
+                  type: "comment",
+                  user: profile,
+                  postId: comment.post_id,
+                  postCaption: post?.caption,
+                  comment: comment.content,
+                  createdAt: comment.created_at,
+                });
+              }
+            });
+          }
         }
       }
 
