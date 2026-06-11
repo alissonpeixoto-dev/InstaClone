@@ -47,7 +47,7 @@ export function useActivities() {
         try {
           const { data: likes, error: likesError } = await supabase
             .from("likes")
-            .select("id, created_at, post_id, liker_id")
+            .select("id, created_at, post_id, user_id")
             .in("post_id", postIds)
             .order("created_at", { ascending: false });
 
@@ -58,7 +58,7 @@ export function useActivities() {
             
             // Get user profiles for likes
             if (likes && likes.length > 0) {
-              const likerIds = [...new Set(likes.map((l) => l.liker_id))];
+              const likerIds = [...new Set(likes.map((l) => l.user_id))];
               const { data: likerProfiles } = await supabase
                 .from("profiles")
                 .select("id, username, avatar_url, full_name")
@@ -69,7 +69,7 @@ export function useActivities() {
               );
 
               likes.forEach((like) => {
-                const profile = profilesMap.get(like.liker_id);
+                const profile = profilesMap.get(like.user_id);
                 if (profile) {
                   const post = userPosts.find((p) => p.id === like.post_id);
                   allActivities.push({
